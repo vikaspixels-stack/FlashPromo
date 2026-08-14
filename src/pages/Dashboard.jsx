@@ -294,7 +294,7 @@ const THEME = {
 };
 
 const UI_STRINGS = {
-  kicker: { en: "Kochi Spark", manglish: "Kochi Spark", ml: "കൊച്ചി സ്പാർക്ക്" },
+  kicker: { en: "FlashPromo AI", manglish: "FlashPromo AI", ml: "FlashPromo AI" },
   appTitle: { en: "Promo Generator", manglish: "Promo Generator", ml: "പ്രമോ ജനറേറ്റർ" },
   yourBusiness: { en: "Your Business", manglish: "Ningalude Business", ml: "നിങ്ങളുടെ ബിസിനസ്" },
   businessName: { en: "Business Name", manglish: "Business Peru", ml: "ബിസിനസ് പേര്" },
