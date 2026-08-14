@@ -294,8 +294,8 @@ const THEME = {
 };
 
 const UI_STRINGS = {
-  kicker: { en: "FlashPromo AI", manglish: "FlashPromo AI", ml: "FlashPromo AI" },
-  appTitle: { en: "Promo Generator", manglish: "Promo Generator", ml: "പ്രമോ ജനറേറ്റർ" },
+  kicker: { en: "Sketchleaf Designs", manglish: "Sketchleaf Designs", ml: "Sketchleaf Designs" },
+  appTitle: { en: "FlashPromo AI", manglish: "FlashPromo AI", ml: "FlashPromo AI" },
   yourBusiness: { en: "Your Business", manglish: "Ningalude Business", ml: "നിങ്ങളുടെ ബിസിനസ്" },
   businessName: { en: "Business Name", manglish: "Business Peru", ml: "ബിസിനസ് പേര്" },
   businessNamePh: { en: "e.g. Kochi Brews Cafe", manglish: "ഉദാ: Kochi Brews Cafe", ml: "ഉദാ: Kochi Brews Cafe" },
