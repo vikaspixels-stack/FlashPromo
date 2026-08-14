@@ -16,12 +16,12 @@ export default function PosterMaker() {
   const [templateId, setTemplateId] = useState(initialTemplate.id);
 
   const [form, setForm] = useState({
-    businessName: "Kochi Brews Cafe",
+    businessName: "Your Business Name",
     headline: initialTemplate.defaults.headline,
     subheadline: initialTemplate.defaults.subheadline,
     ctaText: initialTemplate.defaults.cta,
     phone: "+91 98765 43210",
-    address: "Panampilly Nagar, Kochi",
+    address: "Address",
     brandColor: initialTemplate.color,
     font: initialTemplate.font,
     logo: null,
@@ -305,7 +305,7 @@ export default function PosterMaker() {
             ) : (
               <Download size={16} />
             )}
-            {downloading ? "Preparing PNG..." : downloaded ? "Downloaded!" : "Download PNG"}
+            {downloading ? "Preparing PNG..." : downloaded ? "Downloaded!" : "Download"}
           </button>
         </div>
 
