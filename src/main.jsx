@@ -5,28 +5,21 @@ import './index.css';
 
 const PASSWORD = 'KochiDemo2026';
 
-function ProtectedApp() {
-  const entered = window.prompt('Enter demo password');
+const entered = window.prompt('Enter demo password');
 
-  if (entered !== PASSWORD) {
-    return (
-      <div style={{
-        height: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        fontFamily: 'Arial'
-      }}>
+if (entered !== PASSWORD) {
+  document.body.innerHTML = `
+    <div style='height:100vh;display:flex;align-items:center;justify-content:center;font-family:Arial'>
+      <div style='text-align:center'>
         <h2>Access Denied</h2>
+        <p>Wrong password</p>
       </div>
-    );
-  }
-
-  return <App />;
+    </div>
+  `;
+} else {
+  ReactDOM.createRoot(document.getElementById('root')).render(
+    <React.StrictMode>
+      <App />
+    </React.StrictMode>
+  );
 }
-
-ReactDOM.createRoot(document.getElementById('root')).render(
-  <React.StrictMode>
-    <ProtectedApp />
-  </React.StrictMode>
-);
