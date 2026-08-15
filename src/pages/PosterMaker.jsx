@@ -1,6 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { Link } from "react-router-dom";
-import { toPng } from "html-to-image";
 import { saveAs } from "file-saver";
 import {
   ArrowLeft, Upload, Image as ImageIcon, Download, Wand2, Loader2,
@@ -16,12 +15,12 @@ export default function PosterMaker() {
   const [templateId, setTemplateId] = useState(initialTemplate.id);
 
   const [form, setForm] = useState({
-    businessName: "Your Business Name",
+    businessName: "Kochi Brews Cafe",
     headline: initialTemplate.defaults.headline,
     subheadline: initialTemplate.defaults.subheadline,
     ctaText: initialTemplate.defaults.cta,
     phone: "+91 98765 43210",
-    address: "Address",
+    address: "Panampilly Nagar, Kochi",
     brandColor: initialTemplate.color,
     font: initialTemplate.font,
     logo: null,
@@ -41,10 +40,6 @@ export default function PosterMaker() {
 
   const sizeConfig = useMemo(() => POSTER_SIZES.find((s) => s.id === sizeId) || POSTER_SIZES[0], [sizeId]);
   const template = useMemo(() => POSTER_TEMPLATES.find((t) => t.id === templateId) || POSTER_TEMPLATES[0], [templateId]);
-  const fontClassName = useMemo(
-    () => FONT_OPTIONS.find((f) => f.id === form.font)?.className || "font-body",
-    [form.font]
-  );
 
   // recompute preview scale so the fixed-resolution poster fits the visible panel
   useEffect(() => {
@@ -63,6 +58,11 @@ export default function PosterMaker() {
   }, [sizeConfig]);
 
   const updateField = (key, value) => setForm((f) => ({ ...f, [key]: value }));
+
+  // fired when the user double-click edits a text object directly on the poster canvas
+  const handleCanvasTextEdit = useCallback((key, value) => {
+    setForm((f) => (f[key] === value ? f : { ...f, [key]: value }));
+  }, []);
 
   const handleTemplateSelect = (tpl) => {
     setTemplateId(tpl.id);
@@ -102,12 +102,9 @@ export default function PosterMaker() {
     if (!posterRef.current) return;
     setDownloading(true);
     try {
-      const dataUrl = await toPng(posterRef.current, {
-        width: sizeConfig.width,
-        height: sizeConfig.height,
-        pixelRatio: 1,
-        cacheBust: true,
-      });
+      posterRef.current.deselectAll();
+      const dataUrl = posterRef.current.exportDataURL();
+      if (!dataUrl) throw new Error("Poster canvas not ready");
       const blob = await (await fetch(dataUrl)).blob();
       const filename = `${(form.businessName || "poster").trim().replace(/\s+/g, "-").toLowerCase()}-${sizeId}.png`;
       saveAs(blob, filename);
@@ -118,7 +115,7 @@ export default function PosterMaker() {
     } finally {
       setDownloading(false);
     }
-  }, [sizeConfig, sizeId, form.businessName]);
+  }, [sizeId, form.businessName]);
 
   return (
     <div className="min-h-screen w-full bg-[#0A1F1A] text-white">
@@ -305,7 +302,7 @@ export default function PosterMaker() {
             ) : (
               <Download size={16} />
             )}
-            {downloading ? "Preparing PNG..." : downloaded ? "Downloaded!" : "Download"}
+            {downloading ? "Preparing PNG..." : downloaded ? "Downloaded!" : "Download PNG"}
           </button>
         </div>
 
@@ -313,7 +310,7 @@ export default function PosterMaker() {
         <div ref={previewWrapRef} className="flex-1 flex items-center justify-center p-4 sm:p-8 bg-[#081915] overflow-auto">
           <div style={{ width: sizeConfig.width * scale, height: sizeConfig.height * scale }} className="shadow-2xl rounded-lg overflow-hidden">
             <div style={{ width: sizeConfig.width, height: sizeConfig.height, transform: `scale(${scale})`, transformOrigin: "top left" }}>
-              <PosterCanvas ref={posterRef} sizeConfig={sizeConfig} template={template} form={form} fontClassName={fontClassName} />
+              <PosterCanvas ref={posterRef} sizeConfig={sizeConfig} template={template} form={form} onTextEdit={handleCanvasTextEdit} />
             </div>
           </div>
         </div>

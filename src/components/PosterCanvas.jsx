@@ -1,151 +1,411 @@
-import React, { forwardRef } from "react";
-import { Phone, MapPin, UtensilsCrossed, Sparkles } from "lucide-react";
+import React, { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
+import { Canvas, Textbox, FabricImage, Rect, Circle, Gradient } from "fabric";
 
-const DIAMONDS = Array.from({ length: 14 });
+const FONT_FAMILY_MAP = {
+  poppins: "Poppins",
+  inter: "Inter",
+  malayalam: "'Noto Sans Malayalam'",
+};
 
+const TEXT_DEFAULTS = {
+  fill: "#FFFFFF",
+  editable: true,
+  hasControls: true,
+  cursorColor: "#FFFFFF",
+  selectionColor: "rgba(228,87,46,0.35)",
+  borderColor: "#E4572E",
+  cornerColor: "#E4572E",
+  cornerStyle: "circle",
+  transparentCorners: false,
+  cornerSize: 10,
+  padding: 6,
+  splitByGrapheme: true,
+};
+
+/**
+ * PosterCanvas renders the poster onto an HTML5 canvas via Fabric.js.
+ * Every text element (business name, headline, subheadline, CTA, phone,
+ * address) is a Fabric Textbox: draggable anywhere on the poster, and
+ * directly editable in place via double-click.
+ *
+ * Structural changes (size, template, brand color, font, uploaded photo)
+ * trigger a full rebuild. Pure text-content changes (typed in the side
+ * form) only update the existing objects' text, so any manual dragging
+ * the user has done is preserved while they keep editing copy.
+ */
 const PosterCanvas = forwardRef(function PosterCanvas(
-  { sizeConfig, template, form, fontClassName },
+  { sizeConfig, template, form, onTextEdit },
   ref
 ) {
-  const { width, height } = sizeConfig;
-  const brandColor = form.brandColor || template.color;
+  const canvasElRef = useRef(null);
+  const fabricRef = useRef(null);
+  const objsRef = useRef({});
+  const onTextEditRef = useRef(onTextEdit);
+  onTextEditRef.current = onTextEdit;
 
-  const backgroundStyle = form.posterImage
-    ? { backgroundImage: `url(${form.posterImage})`, backgroundSize: "cover", backgroundPosition: "center" }
-    : { background: `linear-gradient(150deg, ${brandColor} 0%, rgba(10,10,14,0.94) 115%)` };
+  useImperativeHandle(ref, () => ({
+    exportDataURL: () => {
+      const c = fabricRef.current;
+      if (!c) return null;
+      c.discardActiveObject();
+      c.requestRenderAll();
+      return c.toDataURL({ format: "png", multiplier: 1 });
+    },
+    deselectAll: () => {
+      const c = fabricRef.current;
+      if (!c) return;
+      c.discardActiveObject();
+      c.requestRenderAll();
+    },
+  }));
 
-  return (
-    <div
-      ref={ref}
-      style={{ width, height, ...backgroundStyle }}
-      className={`relative overflow-hidden text-white ${fontClassName}`}
-    >
-      {/* dark overlay so text stays legible over any photo */}
-      {form.posterImage && (
-        <div
-          className="absolute inset-0"
-          style={{
-            background:
-              "linear-gradient(180deg, rgba(0,0,0,0.35) 0%, rgba(0,0,0,0.15) 30%, rgba(0,0,0,0.85) 100%)",
-          }}
-        />
-      )}
+  // ---- full structural rebuild ----
+  useEffect(() => {
+    let cancelled = false;
+    const { width, height } = sizeConfig;
+    const brandColor = form.brandColor || template.color;
+    const fontFamily = FONT_FAMILY_MAP[form.font] || "Inter";
 
-      {/* ---------- template decorations ---------- */}
-      {template.kind === "clinic" && (
-        <div className="absolute -top-10 -right-10 w-56 h-56 opacity-10">
-          <div className="absolute top-1/2 left-0 w-full h-10 -translate-y-1/2 bg-white rounded-full" />
-          <div className="absolute left-1/2 top-0 h-full w-10 -translate-x-1/2 bg-white rounded-full" />
-        </div>
-      )}
+    const canvas = new Canvas(canvasElRef.current, {
+      width,
+      height,
+      selection: true,
+      preserveObjectStacking: true,
+    });
+    fabricRef.current = canvas;
 
-      {template.kind === "retail" && (
-        <div
-          className="absolute -left-16 top-10 w-56 text-center py-2 font-display font-extrabold text-sm tracking-widest uppercase shadow-lg"
-          style={{ background: "#111", transform: "rotate(-40deg)" }}
-        >
-          Sale
-        </div>
-      )}
+    canvas.on("text:changed", ({ target }) => {
+      const key = target?.fieldKey;
+      if (key && onTextEditRef.current) onTextEditRef.current(key, target.text);
+    });
 
-      {template.kind === "event" && (
-        <>
-          <div className="absolute -bottom-10 -left-10 w-64 h-64 rounded-full bg-white/10" />
-          <div className="absolute -top-16 -right-16 w-72 h-72 rounded-full bg-white/5" />
-        </>
-      )}
+    (async () => {
+      // ---------- background ----------
+      if (form.posterImage) {
+        try {
+          const img = await FabricImage.fromURL(form.posterImage, { crossOrigin: "anonymous" });
+          if (cancelled) return;
+          const scale = Math.max(width / img.width, height / img.height);
+          img.set({
+            left: width / 2,
+            top: height / 2,
+            originX: "center",
+            originY: "center",
+            scaleX: scale,
+            scaleY: scale,
+            selectable: false,
+            evented: false,
+          });
+          canvas.add(img);
+        } catch (e) {
+          // fall through to gradient below if the photo fails to load
+        }
+        const overlay = new Rect({
+          left: 0,
+          top: 0,
+          width,
+          height,
+          selectable: false,
+          evented: false,
+          fill: new Gradient({
+            type: "linear",
+            coords: { x1: 0, y1: height * 0.32, x2: 0, y2: height },
+            colorStops: [
+              { offset: 0, color: "rgba(6,20,17,0)" },
+              { offset: 1, color: "rgba(6,20,17,0.92)" },
+            ],
+          }),
+        });
+        canvas.add(overlay);
+      } else {
+        const bg = new Rect({
+          left: 0,
+          top: 0,
+          width,
+          height,
+          selectable: false,
+          evented: false,
+          fill: new Gradient({
+            type: "linear",
+            coords: { x1: 0, y1: 0, x2: width, y2: height },
+            colorStops: [
+              { offset: 0, color: brandColor },
+              { offset: 1, color: "rgba(10,10,14,0.94)" },
+            ],
+          }),
+        });
+        canvas.add(bg);
+      }
+      if (cancelled) return;
 
-      {template.kind === "salon" && (
-        <div className="absolute inset-4 border-2 rounded-[1.75rem]" style={{ borderColor: "rgba(255,255,255,0.35)" }} />
-      )}
+      // ---------- template decorations (non-interactive) ----------
+      const common = { selectable: false, evented: false };
+      if (template.kind === "clinic") {
+        canvas.add(new Rect({ ...common, left: width - 220, top: 40, width: 180, height: 36, fill: "#fff", opacity: 0.1, rx: 18, ry: 18 }));
+        canvas.add(new Rect({ ...common, left: width - 158, top: -20, width: 36, height: 180, fill: "#fff", opacity: 0.1, rx: 18, ry: 18 }));
+      }
+      if (template.kind === "retail") {
+        const ribbon = new Rect({ ...common, left: -80, top: 70, width: 260, height: 46, fill: "#111", angle: -35 });
+        const ribbonText = new Textbox("SALE", {
+          ...common,
+          left: -40,
+          top: 78,
+          width: 200,
+          fontFamily,
+          fontWeight: "800",
+          fontSize: Math.round(width * 0.026),
+          fill: "#fff",
+          textAlign: "center",
+          angle: -35,
+          charSpacing: 200,
+        });
+        canvas.add(ribbon, ribbonText);
+      }
+      if (template.kind === "event") {
+        canvas.add(new Circle({ ...common, left: -60, top: height - 120, radius: 128, fill: "#fff", opacity: 0.1 }));
+        canvas.add(new Circle({ ...common, left: width - 140, top: -140, radius: 144, fill: "#fff", opacity: 0.05 }));
+      }
+      if (template.kind === "salon") {
+        canvas.add(new Rect({ ...common, left: 16, top: 16, width: width - 32, height: height - 32, fill: "transparent", stroke: "rgba(255,255,255,0.35)", strokeWidth: 2, rx: 28, ry: 28 }));
+      }
+      if (template.kind === "festival") {
+        const gap = width / 14;
+        for (let i = 0; i < 14; i++) {
+          canvas.add(new Rect({ ...common, left: gap * i + gap / 2, top: 24, width: 10, height: 10, fill: "#E8B44E", angle: 45 }));
+          canvas.add(new Rect({ ...common, left: gap * i + gap / 2, top: height - 34, width: 10, height: 10, fill: "#E8B44E", angle: 45 }));
+        }
+      }
+      if (cancelled) return;
 
-      {template.kind === "festival" && (
-        <>
-          <div className="absolute top-4 left-0 right-0 flex justify-between px-4">
-            {DIAMONDS.map((_, i) => (
-              <div key={`t-${i}`} className="w-2.5 h-2.5 rotate-45" style={{ background: "#E8B44E" }} />
-            ))}
-          </div>
-          <div className="absolute bottom-4 left-0 right-0 flex justify-between px-4">
-            {DIAMONDS.map((_, i) => (
-              <div key={`b-${i}`} className="w-2.5 h-2.5 rotate-45" style={{ background: "#E8B44E" }} />
-            ))}
-          </div>
-        </>
-      )}
+      // ---------- logo / avatar ----------
+      if (form.logo) {
+        try {
+          const logoImg = await FabricImage.fromURL(form.logo, { crossOrigin: "anonymous" });
+          if (cancelled) return;
+          const logoSize = 64;
+          const scale = logoSize / Math.max(logoImg.width, logoImg.height);
+          logoImg.set({
+            left: 32,
+            top: 32,
+            scaleX: scale,
+            scaleY: scale,
+            hasControls: true,
+            fieldKey: "logo",
+          });
+          canvas.add(logoImg);
+        } catch (e) {
+          // ignore broken logo upload
+        }
+      } else {
+        const avatar = new Rect({ left: 32, top: 32, width: 64, height: 64, rx: 16, ry: 16, fill: "rgba(255,255,255,0.2)", stroke: "rgba(255,255,255,0.3)", strokeWidth: 2, selectable: false, evented: false });
+        const initial = new Textbox((form.businessName || "K").trim().charAt(0).toUpperCase(), {
+          left: 32,
+          top: 32,
+          width: 64,
+          height: 64,
+          fontFamily,
+          fontWeight: "700",
+          fontSize: 26,
+          fill: "#fff",
+          textAlign: "center",
+          selectable: false,
+          evented: false,
+          editable: false,
+        });
+        canvas.add(avatar, initial);
+      }
+      if (cancelled) return;
 
-      {/* ---------- logo + business name ---------- */}
-      <div className="absolute top-8 left-8 flex items-center gap-3 z-10">
-        {form.logo ? (
-          <img src={form.logo} alt="logo" className="w-14 h-14 rounded-xl object-cover border-2 border-white/40" />
-        ) : (
-          <div className="w-14 h-14 rounded-xl bg-white/20 border-2 border-white/30 flex items-center justify-center font-display font-bold text-xl">
-            {(form.businessName || "K").trim().charAt(0).toUpperCase()}
-          </div>
-        )}
-        <p className="font-display font-semibold text-lg drop-shadow">{form.businessName || "Your Business"}</p>
-      </div>
+      // ---------- default vertical layout (all fully draggable afterwards) ----------
+      const padX = 48;
+      const headFontSize = Math.max(30, Math.round(width * 0.072));
+      const subFontSize = Math.max(18, Math.round(width * 0.03));
+      const ctaFontSize = Math.max(16, Math.round(width * 0.026));
+      const contactFontSize = Math.max(14, Math.round(width * 0.021));
 
-      {/* ---------- main content block ---------- */}
-      <div className="absolute inset-x-8 bottom-8 z-10 space-y-4">
-        {template.kind === "event" && (
-          <span className="inline-block rounded-full bg-white/20 px-4 py-1.5 text-xs font-semibold uppercase tracking-widest">
-            Event
-          </span>
-        )}
+      const contactLines = (form.phone ? 1 : 0) + (form.address ? 1 : 0);
+      const contactBlockH = contactLines * contactFontSize * 1.5;
+      const ctaBlockH = form.ctaText ? ctaFontSize * 2.2 : 0;
+      const subBlockH = form.subheadline ? subFontSize * 1.3 * 2 : 0;
+      const headBlockH = headFontSize * 1.2 * 2;
+      const gap = 18;
 
-        <h1 className="font-display font-extrabold leading-[1.05] drop-shadow-lg" style={{ fontSize: Math.round(width * 0.072) }}>
-          {form.headline || "Your Headline Here"}
-        </h1>
+      let cursorBottom = height - 48;
+      let contactTop = null, ctaTop = null, subTop = null;
 
-        {form.subheadline && (
-          <p className="font-body text-white/90 drop-shadow" style={{ fontSize: Math.round(width * 0.03) }}>
-            {form.subheadline}
-          </p>
-        )}
+      if (contactLines) {
+        contactTop = cursorBottom - contactBlockH;
+        cursorBottom = contactTop - gap;
+      }
+      if (form.ctaText) {
+        ctaTop = cursorBottom - ctaBlockH;
+        cursorBottom = ctaTop - gap;
+      }
+      if (form.subheadline) {
+        subTop = cursorBottom - subBlockH;
+        cursorBottom = subTop - gap;
+      }
+      const headTop = Math.max(120, cursorBottom - headBlockH);
 
-        <div className="flex items-center gap-3 pt-1 flex-wrap">
-          {form.ctaText && (
-            <span
-              className="inline-flex items-center gap-2 rounded-full font-display font-bold shadow-lg"
-              style={{
-                background: template.kind === "clinic" || template.kind === "salon" ? "#FFFFFF" : brandColor,
-                color: template.kind === "clinic" || template.kind === "salon" ? brandColor : "#FFFFFF",
-                padding: `${Math.round(width * 0.018)}px ${Math.round(width * 0.032)}px`,
-                fontSize: Math.round(width * 0.026),
-              }}
-            >
-              {template.kind === "restaurant" && <UtensilsCrossed size={Math.round(width * 0.026)} />}
-              {form.ctaText}
-            </span>
-          )}
-        </div>
+      // business name
+      const businessNameBox = new Textbox(form.businessName || "Your Business", {
+        ...TEXT_DEFAULTS,
+        left: 112,
+        top: 48,
+        width: width - 160,
+        fontFamily,
+        fontWeight: "600",
+        fontSize: Math.max(18, Math.round(width * 0.026)),
+        fieldKey: "businessName",
+      });
+      canvas.add(businessNameBox);
+      objsRef.current.businessName = businessNameBox;
 
-        {(form.phone || form.address) && (
-          <div className="pt-2 flex flex-col gap-1 text-white/85" style={{ fontSize: Math.round(width * 0.021) }}>
-            {form.phone && (
-              <div className="flex items-center gap-2">
-                <Phone size={Math.round(width * 0.021)} />
-                {form.phone}
-              </div>
-            )}
-            {form.address && (
-              <div className="flex items-center gap-2">
-                <MapPin size={Math.round(width * 0.021)} />
-                {form.address}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
+      // headline
+      const headlineBox = new Textbox(form.headline || "Your Headline Here", {
+        ...TEXT_DEFAULTS,
+        left: padX,
+        top: headTop,
+        width: width - padX * 2,
+        fontFamily,
+        fontWeight: "800",
+        fontSize: headFontSize,
+        lineHeight: 1.08,
+        fieldKey: "headline",
+      });
+      canvas.add(headlineBox);
+      objsRef.current.headline = headlineBox;
 
-      {/* watermark */}
-      <div className="absolute bottom-3 right-4 z-10 flex items-center gap-1 text-white/40" style={{ fontSize: Math.round(width * 0.014) }}>
-        <Sparkles size={Math.round(width * 0.016)} />
-        Made with Kochi Spark
-      </div>
-    </div>
-  );
+      // subheadline
+      if (form.subheadline) {
+        const subBox = new Textbox(form.subheadline, {
+          ...TEXT_DEFAULTS,
+          left: padX,
+          top: subTop,
+          width: width - padX * 2,
+          fontFamily,
+          fontWeight: "400",
+          fontSize: subFontSize,
+          fill: "rgba(255,255,255,0.9)",
+          fieldKey: "subheadline",
+        });
+        canvas.add(subBox);
+        objsRef.current.subheadline = subBox;
+      } else {
+        objsRef.current.subheadline = null;
+      }
+
+      // CTA
+      if (form.ctaText) {
+        const ctaBox = new Textbox(form.ctaText, {
+          ...TEXT_DEFAULTS,
+          left: padX,
+          top: ctaTop,
+          width: width - padX * 2,
+          fontFamily,
+          fontWeight: "700",
+          fontSize: ctaFontSize,
+          fill: template.kind === "clinic" || template.kind === "salon" ? brandColor : "#FFFFFF",
+          backgroundColor: template.kind === "clinic" || template.kind === "salon" ? "#FFFFFF" : brandColor,
+          fieldKey: "ctaText",
+        });
+        canvas.add(ctaBox);
+        objsRef.current.ctaText = ctaBox;
+      } else {
+        objsRef.current.ctaText = null;
+      }
+
+      // phone / address
+      if (form.phone) {
+        const phoneBox = new Textbox(form.phone, {
+          ...TEXT_DEFAULTS,
+          left: padX,
+          top: contactTop,
+          width: width - padX * 2,
+          fontFamily,
+          fontWeight: "500",
+          fontSize: contactFontSize,
+          fill: "rgba(255,255,255,0.85)",
+          fieldKey: "phone",
+        });
+        canvas.add(phoneBox);
+        objsRef.current.phone = phoneBox;
+      } else {
+        objsRef.current.phone = null;
+      }
+
+      if (form.address) {
+        const addressBox = new Textbox(form.address, {
+          ...TEXT_DEFAULTS,
+          left: padX,
+          top: (contactTop || cursorBottom) + (form.phone ? contactFontSize * 1.5 : 0),
+          width: width - padX * 2,
+          fontFamily,
+          fontWeight: "500",
+          fontSize: contactFontSize,
+          fill: "rgba(255,255,255,0.85)",
+          fieldKey: "address",
+        });
+        canvas.add(addressBox);
+        objsRef.current.address = addressBox;
+      } else {
+        objsRef.current.address = null;
+      }
+
+      // watermark (fixed, not draggable/editable)
+      const watermark = new Textbox("Made with Kochi Spark", {
+        left: width - 260,
+        top: height - 34,
+        width: 250,
+        fontFamily,
+        fontSize: Math.max(11, Math.round(width * 0.014)),
+        fill: "rgba(255,255,255,0.45)",
+        textAlign: "right",
+        selectable: false,
+        evented: false,
+        editable: false,
+      });
+      canvas.add(watermark);
+
+      canvas.requestRenderAll();
+    })();
+
+    return () => {
+      cancelled = true;
+      canvas.dispose();
+      fabricRef.current = null;
+      objsRef.current = {};
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sizeConfig.width, sizeConfig.height, template.id, form.posterImage, form.logo, form.brandColor, form.font]);
+
+  // ---- lightweight text-content sync (preserves drag positions) ----
+  useEffect(() => {
+    const objs = objsRef.current;
+    const canvas = fabricRef.current;
+    if (!canvas) return;
+    if (objs.businessName && objs.businessName.text !== (form.businessName || "Your Business")) {
+      objs.businessName.set("text", form.businessName || "Your Business");
+    }
+    if (objs.headline && objs.headline.text !== (form.headline || "Your Headline Here")) {
+      objs.headline.set("text", form.headline || "Your Headline Here");
+    }
+    if (objs.subheadline && form.subheadline && objs.subheadline.text !== form.subheadline) {
+      objs.subheadline.set("text", form.subheadline);
+    }
+    if (objs.ctaText && form.ctaText && objs.ctaText.text !== form.ctaText) {
+      objs.ctaText.set("text", form.ctaText);
+    }
+    if (objs.phone && form.phone && objs.phone.text !== form.phone) {
+      objs.phone.set("text", form.phone);
+    }
+    if (objs.address && form.address && objs.address.text !== form.address) {
+      objs.address.set("text", form.address);
+    }
+    canvas.requestRenderAll();
+  }, [form.businessName, form.headline, form.subheadline, form.ctaText, form.phone, form.address]);
+
+  return <canvas ref={canvasElRef} />;
 });
 
 export default PosterCanvas;
