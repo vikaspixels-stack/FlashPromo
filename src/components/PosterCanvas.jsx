@@ -62,6 +62,9 @@ const PosterCanvas = forwardRef(function PosterCanvas(
   const scaleRef = useRef(1);
   const onTextEditRef = useRef(onTextEdit);
   onTextEditRef.current = onTextEdit;
+  const sizeConfigRef = useRef(sizeConfig);
+  sizeConfigRef.current = sizeConfig;
+  const applySizeRef = useRef(() => {});
 
   useImperativeHandle(ref, () => ({
     exportDataURL: () => {
@@ -94,6 +97,11 @@ const PosterCanvas = forwardRef(function PosterCanvas(
   }));
 
   // ---- responsive sizing: Fabric zoom/viewport, never CSS transform ----
+  // Set up ONCE on mount. Always reads the *latest* logical size via
+  // sizeConfigRef, and is also stored in applySizeRef so the structural
+  // rebuild effect below can call it synchronously the instant a new
+  // canvas is created — it does not rely on ResizeObserver's async first
+  // callback to apply the correct initial scale.
   useEffect(() => {
     const wrap = wrapRef.current;
     if (!wrap) return;
@@ -101,17 +109,18 @@ const PosterCanvas = forwardRef(function PosterCanvas(
     const applySize = () => {
       const c = fabricRef.current;
       if (!c) return;
+      const { width: logicalWidth, height: logicalHeight } = sizeConfigRef.current;
       const availableWidth = wrap.clientWidth;
       const availableHeight = wrap.clientHeight;
       if (!availableWidth || !availableHeight) return;
 
-      const scale = Math.min(availableWidth / sizeConfig.width, availableHeight / sizeConfig.height);
+      const scale = Math.min(availableWidth / logicalWidth, availableHeight / logicalHeight);
       const safeScale = scale > 0 ? scale : 0.1;
       scaleRef.current = safeScale;
 
       c.setDimensions({
-        width: Math.round(sizeConfig.width * safeScale),
-        height: Math.round(sizeConfig.height * safeScale),
+        width: Math.round(logicalWidth * safeScale),
+        height: Math.round(logicalHeight * safeScale),
       });
       c.setZoom(safeScale);
 
@@ -125,12 +134,13 @@ const PosterCanvas = forwardRef(function PosterCanvas(
       c.requestRenderAll();
     };
 
+    applySizeRef.current = applySize;
     applySize();
+
     const ro = new ResizeObserver(applySize);
     ro.observe(wrap);
     return () => ro.disconnect();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sizeConfig.width, sizeConfig.height]);
+  }, []);
 
   // ---- full structural rebuild (size, template, photo, logo, color, font) ----
   useEffect(() => {
@@ -149,6 +159,7 @@ const PosterCanvas = forwardRef(function PosterCanvas(
       preserveObjectStacking: true,
     });
     fabricRef.current = canvas;
+    applySizeRef.current(); // apply correct on-screen scale immediately — don't wait for ResizeObserver's async first callback
 
     canvas.on("text:changed", ({ target }) => {
       const key = target?.fieldKey;
@@ -476,6 +487,7 @@ const PosterCanvas = forwardRef(function PosterCanvas(
       });
       canvas.add(watermark);
 
+      applySizeRef.current(); // ensure newly-added objects get correctly-scaled corner/touch handle sizes
       canvas.requestRenderAll();
     })();
 
