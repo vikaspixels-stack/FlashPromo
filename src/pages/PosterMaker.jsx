@@ -32,30 +32,11 @@ export default function PosterMaker() {
   const [downloaded, setDownloaded] = useState(false);
 
   const posterRef = useRef(null);
-  const previewWrapRef = useRef(null);
   const logoInputRef = useRef(null);
   const photoInputRef = useRef(null);
 
-  const [scale, setScale] = useState(0.3);
-
   const sizeConfig = useMemo(() => POSTER_SIZES.find((s) => s.id === sizeId) || POSTER_SIZES[0], [sizeId]);
   const template = useMemo(() => POSTER_TEMPLATES.find((t) => t.id === templateId) || POSTER_TEMPLATES[0], [templateId]);
-
-  // recompute preview scale so the fixed-resolution poster fits the visible panel
-  useEffect(() => {
-    const el = previewWrapRef.current;
-    if (!el) return;
-    const compute = () => {
-      const availableWidth = el.clientWidth - 32;
-      const availableHeight = el.clientHeight - 32;
-      const s = Math.min(availableWidth / sizeConfig.width, availableHeight / sizeConfig.height, 1);
-      setScale(s > 0 ? s : 0.2);
-    };
-    compute();
-    const ro = new ResizeObserver(compute);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [sizeConfig]);
 
   const updateField = (key, value) => setForm((f) => ({ ...f, [key]: value }));
 
@@ -307,11 +288,9 @@ export default function PosterMaker() {
         </div>
 
         {/* ---------------- Right panel: live preview ---------------- */}
-        <div ref={previewWrapRef} className="flex-1 flex items-center justify-center p-4 sm:p-8 bg-[#081915] overflow-auto">
-          <div style={{ width: sizeConfig.width * scale, height: sizeConfig.height * scale }} className="shadow-2xl rounded-lg overflow-hidden">
-            <div style={{ width: sizeConfig.width, height: sizeConfig.height, transform: `scale(${scale})`, transformOrigin: "top left" }}>
-              <PosterCanvas ref={posterRef} sizeConfig={sizeConfig} template={template} form={form} onTextEdit={handleCanvasTextEdit} />
-            </div>
+        <div className="flex-1 min-h-[420px] p-4 sm:p-8 bg-[#081915]">
+          <div className="w-full h-full min-h-[380px] rounded-lg overflow-hidden shadow-2xl">
+            <PosterCanvas ref={posterRef} sizeConfig={sizeConfig} template={template} form={form} onTextEdit={handleCanvasTextEdit} />
           </div>
         </div>
       </div>
