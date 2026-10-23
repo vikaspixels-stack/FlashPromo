@@ -298,7 +298,7 @@ export default function PosterMaker() {
         </div>
 
         {/* ---------------- Right panel: live preview ---------------- */}
-        <div className="flex-1 min-h-[420px] p-4 sm:p-8 bg-[#081915]">
+        <div className="flex-1 min-w-0 min-h-[420px] h-[min(78vh,900px)] p-4 sm:p-8 bg-[#081915]">
           <div className="w-full h-full min-h-[380px] rounded-lg overflow-hidden shadow-2xl">
             <PosterCanvas ref={posterRef} sizeConfig={sizeConfig} template={template} form={form} onTextEdit={handleCanvasTextEdit} />
           </div>
