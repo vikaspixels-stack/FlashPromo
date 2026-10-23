@@ -332,10 +332,13 @@ const PosterCanvas = forwardRef(function PosterCanvas(
       const textWidth = width * (1 - padXFrac * 2);
       const centerX = width / 2;
 
-      const headFontSize = Math.max(22, Math.round(baseUnit * 0.072));
-      const subFontSize = Math.max(14, Math.round(baseUnit * 0.032));
-      const ctaFontSize = Math.max(12, Math.round(baseUnit * 0.028));
-      const contactFontSize = Math.max(11, Math.round(baseUnit * 0.022));
+      const isStory = height > width * 1.35;
+      const isLandscape = width > height * 1.35;
+      // Landscape needs a tighter type scale; story posters have more vertical room.
+      const headFontSize = Math.round(Math.min(baseUnit * (isLandscape ? 0.055 : isStory ? 0.064 : 0.068), isStory ? 68 : 74));
+      const subFontSize = Math.round(baseUnit * (isLandscape ? 0.027 : 0.029));
+      const ctaFontSize = Math.round(baseUnit * (isLandscape ? 0.024 : 0.026));
+      const contactFontSize = Math.round(baseUnit * (isLandscape ? 0.018 : 0.019));
 
       const businessNameBox = new Textbox(form.businessName || "Your Business", {
         ...TEXT_DEFAULTS,
@@ -353,14 +356,18 @@ const PosterCanvas = forwardRef(function PosterCanvas(
       canvas.add(businessNameBox);
       objsRef.current.businessName = businessNameBox;
 
-      // vertical anchors as fractions of height — safe across all 3 aspect ratios
-      const anchors = { headline: 0.48, subheadline: 0.66, cta: 0.79, phone: 0.89, address: 0.94 };
-      const minHeadTop = height * 0.16; // stay clear of the logo row
+      // Responsive vertical stack: measure each text box and place the next
+      // one after it. This prevents long headlines/subtitles from colliding
+      // with the CTA or contact details in square, story, and landscape formats.
+      const contentTop = height * (isStory ? 0.29 : isLandscape ? 0.25 : 0.30);
+      const contentBottom = height * (isStory ? 0.88 : 0.89);
+      const contentGap = baseUnit * (isLandscape ? 0.018 : 0.022);
+      const textObjects = [];
 
       const headlineBox = new Textbox(form.headline || "Your Headline Here", {
         ...TEXT_DEFAULTS,
         left: centerX,
-        top: Math.max(minHeadTop, height * anchors.headline),
+        top: contentTop,
         originX: "center",
         originY: "top",
         width: textWidth,
@@ -368,19 +375,19 @@ const PosterCanvas = forwardRef(function PosterCanvas(
         fontFamily,
         fontWeight: "800",
         fontSize: headFontSize,
-        lineHeight: 1.1,
+        lineHeight: 1.06,
         cornerSize,
         touchCornerSize,
         fieldKey: "headline",
       });
-      canvas.add(headlineBox);
-      objsRef.current.headline = headlineBox;
+      textObjects.push({ key: "headline", object: headlineBox, baseFontSize: headFontSize, gapAfter: contentGap });
 
+      let subBox = null;
       if (form.subheadline) {
-        const subBox = new Textbox(form.subheadline, {
+        subBox = new Textbox(form.subheadline, {
           ...TEXT_DEFAULTS,
           left: centerX,
-          top: height * anchors.subheadline,
+          top: 0,
           originX: "center",
           originY: "top",
           width: textWidth,
@@ -388,26 +395,24 @@ const PosterCanvas = forwardRef(function PosterCanvas(
           fontFamily,
           fontWeight: "400",
           fontSize: subFontSize,
-          fill: "rgba(255,255,255,0.9)",
+          fill: "rgba(255,255,255,0.94)",
           cornerSize,
           touchCornerSize,
           fieldKey: "subheadline",
         });
-        canvas.add(subBox);
-        objsRef.current.subheadline = subBox;
-      } else {
-        objsRef.current.subheadline = null;
+        textObjects.push({ key: "subheadline", object: subBox, baseFontSize: subFontSize, gapAfter: contentGap * 1.35 });
       }
 
+      let ctaBox = null;
       if (form.ctaText) {
         const isLight = template.kind === "clinic" || template.kind === "salon";
-        const ctaBox = new Textbox(form.ctaText, {
+        ctaBox = new Textbox(form.ctaText, {
           ...TEXT_DEFAULTS,
           left: centerX,
-          top: height * anchors.cta,
+          top: 0,
           originX: "center",
           originY: "top",
-          width: textWidth * 0.7,
+          width: textWidth * 0.72,
           textAlign: "center",
           fontFamily,
           fontWeight: "700",
@@ -418,17 +423,15 @@ const PosterCanvas = forwardRef(function PosterCanvas(
           touchCornerSize,
           fieldKey: "ctaText",
         });
-        canvas.add(ctaBox);
-        objsRef.current.ctaText = ctaBox;
-      } else {
-        objsRef.current.ctaText = null;
+        textObjects.push({ key: "ctaText", object: ctaBox, baseFontSize: ctaFontSize, gapAfter: contentGap * 1.15 });
       }
 
+      let phoneBox = null;
       if (form.phone) {
-        const phoneBox = new Textbox(form.phone, {
+        phoneBox = new Textbox(form.phone, {
           ...TEXT_DEFAULTS,
           left: centerX,
-          top: height * anchors.phone,
+          top: 0,
           originX: "center",
           originY: "top",
           width: textWidth,
@@ -436,22 +439,20 @@ const PosterCanvas = forwardRef(function PosterCanvas(
           fontFamily,
           fontWeight: "500",
           fontSize: contactFontSize,
-          fill: "rgba(255,255,255,0.85)",
+          fill: "rgba(255,255,255,0.9)",
           cornerSize,
           touchCornerSize,
           fieldKey: "phone",
         });
-        canvas.add(phoneBox);
-        objsRef.current.phone = phoneBox;
-      } else {
-        objsRef.current.phone = null;
+        textObjects.push({ key: "phone", object: phoneBox, baseFontSize: contactFontSize, gapAfter: contentGap * 0.45 });
       }
 
+      let addressBox = null;
       if (form.address) {
-        const addressBox = new Textbox(form.address, {
+        addressBox = new Textbox(form.address, {
           ...TEXT_DEFAULTS,
           left: centerX,
-          top: height * anchors.address,
+          top: 0,
           originX: "center",
           originY: "top",
           width: textWidth,
@@ -459,21 +460,48 @@ const PosterCanvas = forwardRef(function PosterCanvas(
           fontFamily,
           fontWeight: "500",
           fontSize: contactFontSize,
-          fill: "rgba(255,255,255,0.85)",
+          fill: "rgba(255,255,255,0.9)",
           cornerSize,
           touchCornerSize,
           fieldKey: "address",
         });
-        canvas.add(addressBox);
-        objsRef.current.address = addressBox;
-      } else {
-        objsRef.current.address = null;
+        textObjects.push({ key: "address", object: addressBox, baseFontSize: contactFontSize, gapAfter: 0 });
       }
+
+      const measureStack = () => textObjects.reduce((total, item) => {
+        item.object.initDimensions();
+        return total + item.object.height + item.gapAfter;
+      }, 0);
+
+      // Scale all text proportionally if the supplied copy is longer than the
+      // available safe area; never shrink below 72% of the intended type size.
+      const availableStackHeight = contentBottom - contentTop;
+      const measuredStackHeight = measureStack();
+      const fitScale = measuredStackHeight > availableStackHeight
+        ? Math.max(0.72, availableStackHeight / measuredStackHeight)
+        : 1;
+
+      let nextTop = contentTop;
+      textObjects.forEach((item) => {
+        if (fitScale < 1) {
+          item.object.set("fontSize", Math.max(10, Math.round(item.baseFontSize * fitScale)));
+          item.object.initDimensions();
+        }
+        item.object.set({ top: nextTop, left: centerX });
+        nextTop += item.object.height + item.gapAfter * fitScale;
+        canvas.add(item.object);
+        objsRef.current[item.key] = item.object;
+      });
+
+      if (!subBox) objsRef.current.subheadline = null;
+      if (!ctaBox) objsRef.current.ctaText = null;
+      if (!phoneBox) objsRef.current.phone = null;
+      if (!addressBox) objsRef.current.address = null;
 
       // watermark — fixed, not draggable/editable, always inside bounds
       const watermark = new Textbox("Made with Kochi Spark", {
         left: width - width * 0.04,
-        top: height - height * 0.025,
+        top: height - height * 0.035,
         originX: "right",
         originY: "bottom",
         width: width * 0.4,
