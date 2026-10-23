@@ -1,0 +1,15 @@
+{
+  "id": "/",
+  "name": "FlashPromo — Local Business Content Studio",
+  "short_name": "FlashPromo",
+  "description": "Create social captions, poster copy, Reel scripts and WhatsApp promotions for local businesses.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#FBF1E1",
+  "theme_color": "#0D4F44",
+  "icons": [
+    { "src": "/pwa-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
