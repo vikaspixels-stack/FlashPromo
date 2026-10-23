@@ -1,6 +1,7 @@
 import React, { Suspense, lazy } from "react";
 import { Routes, Route } from "react-router-dom";
 import Dashboard from "./pages/Dashboard.jsx";
+import ContentPack from "./pages/ContentPack.jsx";
 
 const PosterMaker = lazy(() => import("./pages/PosterMaker.jsx"));
 
@@ -8,6 +9,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/" element={<Dashboard />} />
+      <Route path="/content-pack" element={<ContentPack />} />
       <Route
         path="/poster-maker"
         element={
