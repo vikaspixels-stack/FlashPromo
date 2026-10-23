@@ -65,6 +65,7 @@ const PosterCanvas = forwardRef(function PosterCanvas(
   const sizeConfigRef = useRef(sizeConfig);
   sizeConfigRef.current = sizeConfig;
   const applySizeRef = useRef(() => {});
+  const relayoutStackRef = useRef(() => {});
 
   useImperativeHandle(ref, () => ({
     exportDataURL: () => {
@@ -383,8 +384,8 @@ const PosterCanvas = forwardRef(function PosterCanvas(
       textObjects.push({ key: "headline", object: headlineBox, baseFontSize: headFontSize, gapAfter: contentGap });
 
       let subBox = null;
-      if (form.subheadline) {
-        subBox = new Textbox(form.subheadline, {
+      {
+        subBox = new Textbox(form.subheadline || "", {
           ...TEXT_DEFAULTS,
           left: centerX,
           top: 0,
@@ -404,9 +405,9 @@ const PosterCanvas = forwardRef(function PosterCanvas(
       }
 
       let ctaBox = null;
-      if (form.ctaText) {
+      {
         const isLight = template.kind === "clinic" || template.kind === "salon";
-        ctaBox = new Textbox(form.ctaText, {
+        ctaBox = new Textbox(form.ctaText || "", {
           ...TEXT_DEFAULTS,
           left: centerX,
           top: 0,
@@ -427,8 +428,8 @@ const PosterCanvas = forwardRef(function PosterCanvas(
       }
 
       let phoneBox = null;
-      if (form.phone) {
-        phoneBox = new Textbox(form.phone, {
+      {
+        phoneBox = new Textbox(form.phone || "", {
           ...TEXT_DEFAULTS,
           left: centerX,
           top: 0,
@@ -448,8 +449,8 @@ const PosterCanvas = forwardRef(function PosterCanvas(
       }
 
       let addressBox = null;
-      if (form.address) {
-        addressBox = new Textbox(form.address, {
+      {
+        addressBox = new Textbox(form.address || "", {
           ...TEXT_DEFAULTS,
           left: centerX,
           top: 0,
@@ -468,30 +469,42 @@ const PosterCanvas = forwardRef(function PosterCanvas(
         textObjects.push({ key: "address", object: addressBox, baseFontSize: contactFontSize, gapAfter: 0 });
       }
 
-      const measureStack = () => textObjects.reduce((total, item) => {
-        item.object.initDimensions();
-        return total + item.object.height + item.gapAfter;
-      }, 0);
-
-      // Scale all text proportionally if the supplied copy is longer than the
-      // available safe area; never shrink below 72% of the intended type size.
-      const availableStackHeight = contentBottom - contentTop;
-      const measuredStackHeight = measureStack();
-      const fitScale = measuredStackHeight > availableStackHeight
-        ? Math.max(0.72, availableStackHeight / measuredStackHeight)
-        : 1;
-
-      let nextTop = contentTop;
-      textObjects.forEach((item) => {
-        if (fitScale < 1) {
-          item.object.set("fontSize", Math.max(10, Math.round(item.baseFontSize * fitScale)));
+      const relayoutStack = () => {
+        const activeItems = textObjects.filter((item) =>
+          item.key === "headline" || Boolean(item.object.text?.trim())
+        );
+        activeItems.forEach((item) => {
+          item.object.set({ fontSize: item.baseFontSize, opacity: 1, selectable: true, evented: true });
           item.object.initDimensions();
-        }
-        item.object.set({ top: nextTop, left: centerX });
-        nextTop += item.object.height + item.gapAfter * fitScale;
+        });
+        textObjects.filter((item) => !activeItems.includes(item)).forEach((item) => {
+          item.object.set({ opacity: 0, selectable: false, evented: false });
+        });
+
+        const availableStackHeight = contentBottom - contentTop;
+        const measuredStackHeight = activeItems.reduce((total, item) => total + item.object.height + item.gapAfter, 0);
+        const fitScale = measuredStackHeight > availableStackHeight
+          ? Math.max(0.68, availableStackHeight / measuredStackHeight)
+          : 1;
+
+        let nextTop = contentTop;
+        activeItems.forEach((item) => {
+          if (fitScale < 1) {
+            item.object.set("fontSize", Math.max(10, Math.round(item.baseFontSize * fitScale)));
+            item.object.initDimensions();
+          }
+          item.object.set({ top: nextTop, left: centerX });
+          nextTop += item.object.height + item.gapAfter * fitScale;
+        });
+        canvas.requestRenderAll();
+      };
+
+      textObjects.forEach((item) => {
         canvas.add(item.object);
         objsRef.current[item.key] = item.object;
       });
+      relayoutStackRef.current = relayoutStack;
+      relayoutStack();
 
       if (!subBox) objsRef.current.subheadline = null;
       if (!ctaBox) objsRef.current.ctaText = null;
@@ -539,18 +552,19 @@ const PosterCanvas = forwardRef(function PosterCanvas(
     if (objs.headline && objs.headline.text !== (form.headline || "Your Headline Here")) {
       objs.headline.set("text", form.headline || "Your Headline Here");
     }
-    if (objs.subheadline && form.subheadline && objs.subheadline.text !== form.subheadline) {
-      objs.subheadline.set("text", form.subheadline);
+    if (objs.subheadline && objs.subheadline.text !== (form.subheadline || "")) {
+      objs.subheadline.set("text", form.subheadline || "");
     }
-    if (objs.ctaText && form.ctaText && objs.ctaText.text !== form.ctaText) {
-      objs.ctaText.set("text", form.ctaText);
+    if (objs.ctaText && objs.ctaText.text !== (form.ctaText || "")) {
+      objs.ctaText.set("text", form.ctaText || "");
     }
-    if (objs.phone && form.phone && objs.phone.text !== form.phone) {
-      objs.phone.set("text", form.phone);
+    if (objs.phone && objs.phone.text !== (form.phone || "")) {
+      objs.phone.set("text", form.phone || "");
     }
-    if (objs.address && form.address && objs.address.text !== form.address) {
-      objs.address.set("text", form.address);
+    if (objs.address && objs.address.text !== (form.address || "")) {
+      objs.address.set("text", form.address || "");
     }
+    relayoutStackRef.current();
     canvas.requestRenderAll();
   }, [form.businessName, form.headline, form.subheadline, form.ctaText, form.phone, form.address]);
 
