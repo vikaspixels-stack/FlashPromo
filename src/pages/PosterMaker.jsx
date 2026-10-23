@@ -262,18 +262,26 @@ export default function PosterMaker() {
 
           {/* uploads */}
           <div className="grid grid-cols-2 gap-2">
-            <UploadBox
-              label="Logo"
-              value={form.logo}
-              onPick={() => logoInputRef.current?.click()}
-              onClear={() => updateField("logo", null)}
-            />
-            <UploadBox
-              label="Poster Photo"
-              value={form.posterImage}
-              onPick={() => photoInputRef.current?.click()}
-              onClear={() => updateField("posterImage", null)}
-            />
+            <div>
+              <UploadBox
+                label="Logo"
+                value={form.logo}
+                onPick={() => logoInputRef.current?.click()}
+                onClear={() => updateField("logo", null)}
+                fit="contain"
+              />
+              <p className="mt-1 text-[10px] leading-snug text-white/45">Transparent PNG works best.</p>
+            </div>
+            <div>
+              <UploadBox
+                label="Poster Photo"
+                value={form.posterImage}
+                onPick={() => photoInputRef.current?.click()}
+                onClear={() => updateField("posterImage", null)}
+                fit="cover"
+              />
+              <p className="mt-1 text-[10px] leading-snug text-white/45">Use a product or business photo, not a finished poster.</p>
+            </div>
           </div>
           <input ref={logoInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => handleFileToDataUrl(e, "logo")} />
           <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => handleFileToDataUrl(e, "posterImage")} />
@@ -320,13 +328,13 @@ function Field({ label, children }) {
   );
 }
 
-function UploadBox({ label, value, onPick, onClear }) {
+function UploadBox({ label, value, onPick, onClear, fit = "cover" }) {
   return (
     <div>
       <p className="text-[11px] font-medium text-white/60 mb-1">{label}</p>
       {value ? (
         <div className="relative rounded-xl overflow-hidden border border-white/15 h-20">
-          <img src={value} alt={label} className="w-full h-full object-cover" />
+          <img src={value} alt={label} className={`w-full h-full ${fit === "contain" ? "object-contain bg-[#142E28] p-2" : "object-cover"}`} />
           <button
             onClick={onClear}
             className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/60 flex items-center justify-center"
