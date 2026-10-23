@@ -432,6 +432,13 @@ export default function Dashboard() {
               </div>
               <div className="flex items-center gap-2">
                 <Link
+                  to="/content-pack"
+                  className="flex items-center gap-1.5 rounded-full bg-[#E8B44E] px-3 h-9 text-xs font-semibold text-[#12312B] active:scale-90 transition-transform"
+                >
+                  <Sparkles size={14} />
+                  Content Pack
+                </Link>
+                <Link
                   to="/poster-maker"
                   className="flex items-center gap-1.5 rounded-full bg-white/15 px-3 h-9 text-xs font-semibold text-white active:scale-90 transition-transform"
                 >
