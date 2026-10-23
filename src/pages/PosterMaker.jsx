@@ -14,17 +14,27 @@ export default function PosterMaker() {
   const [sizeId, setSizeId] = useState(POSTER_SIZES[0].id);
   const [templateId, setTemplateId] = useState(initialTemplate.id);
 
-  const [form, setForm] = useState({
-    businessName: "Kochi Brews Cafe",
-    headline: initialTemplate.defaults.headline,
-    subheadline: initialTemplate.defaults.subheadline,
-    ctaText: initialTemplate.defaults.cta,
-    phone: "+91 98765 43210",
-    address: "Panampilly Nagar, Kochi",
-    brandColor: initialTemplate.color,
-    font: initialTemplate.font,
-    logo: null,
-    posterImage: null,
+  const [form, setForm] = useState(() => {
+    const defaults = {
+      businessName: "Kochi Brews Cafe",
+      headline: initialTemplate.defaults.headline,
+      subheadline: initialTemplate.defaults.subheadline,
+      ctaText: initialTemplate.defaults.cta,
+      phone: "",
+      address: "Panampilly Nagar, Kochi",
+      brandColor: initialTemplate.color,
+      font: initialTemplate.font,
+      logo: null,
+      posterImage: null,
+    };
+    try {
+      const prefill = JSON.parse(localStorage.getItem("flashpromo-poster-prefill") || "null");
+      if (!prefill) return defaults;
+      localStorage.removeItem("flashpromo-poster-prefill");
+      return { ...defaults, ...prefill };
+    } catch {
+      return defaults;
+    }
   });
 
   const [generating, setGenerating] = useState(false);
